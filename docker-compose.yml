@@ -40,6 +40,7 @@ services:
     restart: no
     environment:
       - NODE_ENV=development
+      - VITE_API_URL=http://localhost:8080
     develop:
       watch:
         - action: sync
@@ -53,6 +54,8 @@ services:
         - action: rebuild
           path: ./frontend/vite.config.ts
           target: /app/vite.config.ts
+    depends_on:
+      - backend
 
 volumes:
   ct_mri_viewer_postgres_data:
