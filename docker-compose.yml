@@ -1,0 +1,58 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: ct-mri-viewer-db
+    restart: no
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: ct_mri_viewer_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - ct_mri_viewer_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U root -d ct_mri_viewer_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend/
+    container_name: ct-mri-viewer-backend
+    ports:
+      - "8080:8000"
+    volumes:
+      - ./backend/src:/app/src
+    environment:
+      DATABASE_URL: postgresql://root:root@db:5432/ct_mri_viewer_db
+    command: fastapi dev src/main.py --host 0.0.0.0 --port 8000
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  frontend:
+    build: ./frontend/
+    container_name: ct-mri-viewer-frontend
+    ports:
+      - "5173:5173"
+    restart: no
+    environment:
+      - NODE_ENV=development
+    develop:
+      watch:
+        - action: sync
+          path: ./frontend/src
+          target: /app/src
+          ignore:
+            - node_modules/
+        - action: rebuild
+          path: ./frontend/package.json
+          target: /app/package.json
+        - action: rebuild
+          path: ./frontend/vite.config.ts
+          target: /app/vite.config.ts
+
+volumes:
+  ct_mri_viewer_postgres_data:
