@@ -1,0 +1,73 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: ct-mri-viewer-db
+    restart: no
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: ct_mri_viewer_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - ct_mri_viewer_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U root -d ct_mri_viewer_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend/
+    container_name: ct-mri-viewer-backend
+    restart: no
+    ports:
+      - "8080:8080"
+      - "5005:5005"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/ct_mri_viewer_db
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=root
+    volumes:
+      - gradle_cache:/root/.gradle
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./backend/src/main/resources
+          target: /app/src/main/resources
+        - action: sync
+          path: ./backend/src
+          target: /app/src
+        - action: rebuild
+          path: ./backend/build.gradle
+          target: /app/build.gradle
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend/
+    container_name: ct-mri-viewer-frontend
+    ports:
+      - "4200:4200"
+    restart: no
+    environment:
+      - NODE_ENV=development
+      - VITE_API_URL=http://localhost:8080
+    develop:
+      watch:
+        - action: sync
+          path: ./frontend/src
+          target: /app/src
+        - action: sync+restart
+          path: ./frontend/angular.json
+          target: /app/angular.json
+        - action: rebuild
+          path: ./frontend/package.json
+          target: /app/package.json
+        - action: rebuild
+          path: ./frontend/package-lock.json
+          target: /app/package-lock.json
+volumes:
+  ct_mri_viewer_postgres_data:
+  gradle_cache:
